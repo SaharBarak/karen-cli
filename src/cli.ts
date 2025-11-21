@@ -30,6 +30,10 @@ program
   .option('-c, --config <path>', 'Path to karen.config.js')
   .option('--api-key <key>', 'Anthropic API key for AI-powered analysis')
   .option('--no-ai', 'Disable AI visual analysis')
+  .option('--github-repo <url>', 'GitHub repository URL (e.g., https://github.com/user/repo)')
+  .option('--github-token <token>', 'GitHub personal access token')
+  .option('--create-pr', 'Automatically create a PR with fixes (requires --github-repo and --github-token)')
+  .option('--branch <name>', 'Custom branch name for PR (default: karen-fixes-<timestamp>)')
   .action(async (url: string, options) => {
     const spinner = ora('Karen is getting ready to judge your CSS...').start();
 
@@ -121,6 +125,35 @@ program
       console.log(`\n${pc.cyan('📄 Full report:')} ${jsonPath}`);
       if (options.markdown) {
         console.log(`${pc.cyan('📝 Markdown report:')} ${options.markdown}`);
+      }
+
+      // Create PR if requested
+      if (options.createPr) {
+        if (!options.githubRepo || !options.githubToken) {
+          console.log(pc.yellow('\n⚠️  --create-pr requires --github-repo and --github-token'));
+        } else {
+          const { createFixPR } = await import('./core/github-fixer.js');
+          const prSpinner = ora('Creating GitHub PR with fixes...').start();
+
+          const prResult = await createFixPR(auditResult, {
+            repoUrl: options.githubRepo,
+            githubToken: options.githubToken,
+            branchName: options.branch,
+          });
+
+          if (prResult.isErr()) {
+            prSpinner.fail(pc.red(`Failed to create PR: ${prResult.error}`));
+          } else {
+            const pr = prResult.value;
+            prSpinner.succeed(pc.green('PR created successfully!'));
+            console.log(pc.gray('━'.repeat(50)));
+            console.log(`${pc.cyan('🎯 Pull Request:')} ${pr.prUrl}`);
+            console.log(`${pc.cyan('   PR Number:')} #${pr.prNumber}`);
+            console.log(`${pc.cyan('   Files Changed:')} ${pr.filesChanged}`);
+            console.log(`${pc.cyan('   Issues Fixed:')} ${pr.issuesFixed}`);
+            console.log(pc.gray('━'.repeat(50)));
+          }
+        }
       }
 
       // Exit with appropriate code
