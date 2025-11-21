@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  karen-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NODE_ENV=production
+    volumes:
+      - ./output:/app/output
+    command: audit https://example.com --output /app/output/tasks.json --md /app/output/TASKS.md

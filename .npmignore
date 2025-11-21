@@ -1,0 +1,37 @@
+# Source files (we ship dist/)
+src/
+*.test.ts
+*.spec.ts
+tsconfig.json
+
+# Development files
+.env
+.env.*
+node_modules/
+coverage/
+*.log
+
+# Documentation
+*.md
+!README.md
+
+# Build artifacts
+.DS_Store
+output/
+artifacts/
+screenshots/
+KAREN_TASKS.md
+karen-audit*.json
+
+# Docker files (users can get from GitHub)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Git
+.git/
+.gitignore
+
+# Architecture docs
+ARCHITECTURE_VERIFICATION.md
+FINAL_IMPLEMENTATION_REPORT.md

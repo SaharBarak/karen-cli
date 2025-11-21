@@ -1,0 +1,66 @@
+{
+  "name": "karen-cli",
+  "version": "1.0.0",
+  "description": "Karen CLI - Sassy CSS Layout Auditor",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "karen": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/cli.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "clean": "rm -rf dist",
+    "postinstall": "playwright install chromium",
+    "prepublishOnly": "pnpm build && pnpm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saharbarak/KarenCLI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saharbarak/KarenCLI/issues"
+  },
+  "homepage": "https://github.com/saharbarak/KarenCLI#readme",
+  "keywords": [
+    "css",
+    "audit",
+    "layout",
+    "cli",
+    "playwright",
+    "accessibility",
+    "design-system",
+    "wcag",
+    "responsive-design",
+    "ai-powered"
+  ],
+  "author": "Sahar Barak",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "cheerio": "^1.0.0",
+    "commander": "^12.1.0",
+    "dotenv": "^17.2.3",
+    "neverthrow": "^8.2.0",
+    "ora": "^8.1.1",
+    "picocolors": "^1.1.1",
+    "playwright": "^1.49.1",
+    "postcss": "^8.4.49",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,16 @@
+node_modules
+dist
+*.test.ts
+*.md
+.git
+.gitignore
+.env
+.env.*
+coverage
+*.log
+.DS_Store
+output
+artifacts
+screenshots
+KAREN_TASKS.md
+karen-audit*.json
