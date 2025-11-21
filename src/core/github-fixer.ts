@@ -1,19 +1,21 @@
 /**
  * GitHub PR Auto-Fixer (CLI Version - 100% Client-Side)
- * Runs entirely on the user's machine with their GitHub token
+ * Uses GitHub CLI (gh) for authentication and native git for operations
  */
 
-import { Octokit } from '@octokit/rest';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { promises as fs } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import path from 'path';
 import os from 'os';
 import type { Issue, AuditResult } from '../types/audit.js';
 import { Result, ok, err } from './result.js';
 
+const execAsync = promisify(exec);
+
 export interface GitHubFixerOptions {
-  repoUrl: string;
-  githubToken: string;
+  repoUrl?: string; // Optional - auto-detected from git remote if not provided
   branchName?: string;
   baseBranch?: string;
 }
@@ -27,54 +29,72 @@ export interface PRResult {
 
 /**
  * Main function to create a PR with CSS fixes
- * CLIENT-SIDE ONLY: Clones repo locally, applies fixes, pushes from user's machine
+ * Uses gh CLI and native git - no manual token handling
  */
 export async function createFixPR(
   auditResult: AuditResult,
-  options: GitHubFixerOptions
+  options: GitHubFixerOptions = {}
 ): Promise<Result<PRResult, string>> {
   let tempDir: string | null = null;
 
   try {
+    // Check if gh CLI is installed and authenticated
+    const authCheck = await checkGitHubAuth();
+    if (!authCheck.success) {
+      return err(authCheck.error);
+    }
+
+    // Auto-detect repo from current directory if not provided
+    let repoUrl = options.repoUrl;
+    if (!repoUrl) {
+      const detectedRepo = await detectCurrentRepo();
+      if (detectedRepo) {
+        repoUrl = detectedRepo;
+        console.log(`✓ Auto-detected repository: ${repoUrl}`);
+      } else {
+        return err(
+          'Could not auto-detect GitHub repository. Please run this command from within a git repository or provide --github-repo flag.'
+        );
+      }
+    }
+
     // Parse GitHub repo URL
-    const repoInfo = parseRepoUrl(options.repoUrl);
+    const repoInfo = parseRepoUrl(repoUrl);
     if (!repoInfo) {
       return err('Invalid GitHub repository URL. Expected format: https://github.com/owner/repo');
     }
 
-    // Initialize Octokit
-    const octokit = new Octokit({ auth: options.githubToken });
-
-    // Create temporary directory for cloning (on user's machine)
+    // Create temporary directory for cloning
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'karen-fixes-'));
-    const git: SimpleGit = simpleGit(tempDir);
+    const git: SimpleGit = simpleGit();
 
-    console.log('🔄 Cloning repository to your machine...');
+    console.log('🔄 Cloning repository locally...');
 
-    // Clone using token for authentication
-    const cloneUrl = `https://${options.githubToken}@github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
+    // Clone using native git (will use SSH keys or credential manager automatically)
+    const cloneUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
     await git.clone(cloneUrl, tempDir);
-    await git.cwd(tempDir);
 
-    // Configure git user (use GitHub API to get user info)
-    const { data: user } = await octokit.users.getAuthenticated();
-    await git.addConfig('user.name', user.name || user.login);
-    await git.addConfig('user.email', user.email || `${user.login}@users.noreply.github.com`);
+    // Change to temp directory
+    const gitInTemp: SimpleGit = simpleGit(tempDir);
 
     // Checkout base branch
     const baseBranch = options.baseBranch || 'main';
     try {
-      await git.checkout(baseBranch);
+      await gitInTemp.checkout(baseBranch);
     } catch {
       // Try 'master' if 'main' doesn't exist
-      await git.checkout('master');
+      try {
+        await gitInTemp.checkout('master');
+      } catch {
+        return err('Could not find default branch (tried "main" and "master")');
+      }
     }
 
     // Create fix branch
     const branchName = options.branchName || `karen-fixes-${Date.now()}`;
-    await git.checkoutLocalBranch(branchName);
+    await gitInTemp.checkoutLocalBranch(branchName);
 
-    // Apply fixes from issues (on user's local machine)
+    // Apply fixes from issues
     console.log('🔧 Applying fixes locally...');
     const filesChanged = await applyFixes(tempDir, auditResult.issues);
 
@@ -83,32 +103,40 @@ export async function createFixPR(
       return err('No fixable issues found. All issues may require manual intervention.');
     }
 
-    // Commit changes locally
+    // Commit changes
     console.log('💾 Committing changes...');
-    await git.add('.');
-    await git.commit(generateCommitMessage(auditResult));
+    await gitInTemp.add('.');
+    await gitInTemp.commit(generateCommitMessage(auditResult));
 
-    // Push to remote (from user's machine)
-    console.log('📤 Pushing to GitHub from your machine...');
-    await git.push('origin', branchName, ['--set-upstream']);
+    // Push to remote using native git (uses user's credentials)
+    console.log('📤 Pushing to GitHub...');
+    await gitInTemp.push('origin', branchName, ['--set-upstream']);
 
-    // Create PR via API
+    // Create PR using gh CLI
     console.log('🎯 Creating pull request...');
-    const pr = await octokit.pulls.create({
-      owner: repoInfo.owner,
-      repo: repoInfo.repo,
-      title: generatePRTitle(auditResult),
-      head: branchName,
-      base: baseBranch,
-      body: generatePRDescription(auditResult),
-    });
+    const prTitle = generatePRTitle(auditResult);
+    const prBody = generatePRDescription(auditResult);
+
+    // Save PR body to temp file (gh CLI reads from stdin or file)
+    const prBodyFile = path.join(tempDir, 'pr-body.md');
+    await fs.writeFile(prBodyFile, prBody, 'utf-8');
+
+    // Create PR using gh CLI
+    const { stdout } = await execAsync(
+      `gh pr create --repo "${repoInfo.owner}/${repoInfo.repo}" --base "${baseBranch}" --head "${branchName}" --title "${prTitle}" --body-file "${prBodyFile}"`,
+      { cwd: tempDir }
+    );
+
+    // Parse PR URL from gh CLI output (last line is the URL)
+    const prUrl = stdout.trim().split('\n').pop() || '';
+    const prNumber = parseInt(prUrl.split('/').pop() || '0', 10);
 
     // Cleanup local temp directory
     await cleanup(tempDir);
 
     return ok({
-      prUrl: pr.data.html_url,
-      prNumber: pr.data.number,
+      prUrl,
+      prNumber,
       filesChanged,
       issuesFixed: auditResult.issues.filter((i) => i.fix).length,
     });
@@ -116,6 +144,57 @@ export async function createFixPR(
     // Cleanup on error
     if (tempDir) await cleanup(tempDir);
     return err(`Failed to create PR: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Check if GitHub CLI is installed and user is authenticated
+ */
+async function checkGitHubAuth(): Promise<{ success: boolean; error: string }> {
+  try {
+    // Check if gh is installed
+    await execAsync('gh --version');
+  } catch {
+    return {
+      success: false,
+      error:
+        'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/ and run "gh auth login"',
+    };
+  }
+
+  try {
+    // Check if user is authenticated
+    await execAsync('gh auth status');
+    return { success: true, error: '' };
+  } catch {
+    return {
+      success: false,
+      error: 'Not authenticated with GitHub. Run "gh auth login" first.',
+    };
+  }
+}
+
+/**
+ * Auto-detect current repository from git remote
+ */
+async function detectCurrentRepo(): Promise<string | null> {
+  try {
+    const git = simpleGit();
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find((r) => r.name === 'origin');
+
+    if (!origin || !origin.refs.fetch) {
+      return null;
+    }
+
+    // Extract GitHub URL from remote
+    const url = origin.refs.fetch;
+    const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+    if (!match) return null;
+
+    return `https://github.com/${match[1]}/${match[2]}`;
+  } catch {
+    return null;
   }
 }
 
