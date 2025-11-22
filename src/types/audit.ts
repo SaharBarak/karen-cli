@@ -26,6 +26,22 @@ export interface LayoutMetrics {
   visibleElements: number;
   overflowingElements: number;
   performanceScore: number;
+
+  // Core Web Vitals (collected via performance-metrics.ts)
+  lcp?: number; // Largest Contentful Paint (ms)
+  cls?: number; // Cumulative Layout Shift (score)
+  fid?: number; // First Input Delay (ms)
+  inp?: number; // Interaction to Next Paint (ms)
+  ttfb?: number; // Time to First Byte (ms)
+  fcp?: number; // First Contentful Paint (ms)
+  tti?: number; // Time to Interactive (ms)
+  tbt?: number; // Total Blocking Time (ms)
+
+  // Resource metrics
+  renderBlockingResources?: number;
+  imagesWithoutDimensions?: number;
+  unoptimizedImages?: number;
+  fontLoadingIssues?: number;
 }
 
 export interface ViewportSnapshot {

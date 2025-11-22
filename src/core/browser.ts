@@ -6,6 +6,7 @@ import { chromium, type Browser, type Page } from 'playwright';
 import type { Viewport, KarenConfig } from '../types/config.js';
 import type { ViewportSnapshot, DOMElement, LayoutMetrics } from '../types/audit.js';
 import { type KarenResult, ok, err, KarenError, resultify } from './result.js';
+import { collectWebVitals, calculatePerformanceScore } from './performance-metrics.js';
 
 export class BrowserManager {
   private browsers: Browser[] = [];
@@ -50,8 +51,11 @@ export class BrowserManager {
         // Extract DOM and computed styles
         const dom = await this.extractDOM(page);
 
+        // Collect performance metrics (Core Web Vitals)
+        const performanceMetrics = await collectWebVitals(page);
+
         // Calculate layout metrics
-        const metrics = await this.calculateMetrics(page);
+        const metrics = await this.calculateMetrics(page, performanceMetrics);
 
         // Get console errors
         const errors: string[] = [];
@@ -130,8 +134,11 @@ export class BrowserManager {
     });
   }
 
-  private async calculateMetrics(page: Page): Promise<LayoutMetrics> {
-    return page.evaluate(() => {
+  private async calculateMetrics(
+    page: Page,
+    performanceMetrics: any
+  ): Promise<LayoutMetrics> {
+    const layoutMetrics = await page.evaluate(() => {
       const allElements = document.querySelectorAll('*');
       const visibleElements = Array.from(allElements).filter((el) => {
         const style = window.getComputedStyle(el);
@@ -156,9 +163,18 @@ export class BrowserManager {
         totalElements: allElements.length,
         visibleElements: visibleElements.length,
         overflowingElements,
-        performanceScore: 0, // TODO: Calculate performance score
       };
     });
+
+    // Calculate performance score from Core Web Vitals
+    const performanceScore = calculatePerformanceScore(performanceMetrics);
+
+    // Merge layout metrics with performance metrics
+    return {
+      ...layoutMetrics,
+      performanceScore,
+      ...performanceMetrics, // Spread all Core Web Vitals (lcp, cls, inp, etc.)
+    };
   }
 
   async closeAll(): Promise<void> {
