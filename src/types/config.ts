@@ -172,7 +172,7 @@ export const defaultConfig: KarenConfig = {
     AAA: 7.0,
   },
   failOn: ['critical', 'high'],
-  features: ['overflow', 'spacing', 'typescale', 'colors', 'accessibility', 'design-system'],
+  features: ['overflow', 'spacing', 'typescale', 'colors', 'accessibility', 'design-system', 'performance'],
   outputFormat: 'both',
   outputDir: './karen-output',
 };
