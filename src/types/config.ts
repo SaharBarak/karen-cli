@@ -30,7 +30,8 @@ export type AuditFeature =
   | 'typescale'
   | 'colors'
   | 'accessibility'
-  | 'design-system';
+  | 'design-system'
+  | 'performance';
 
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low';
 

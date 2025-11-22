@@ -136,6 +136,7 @@ export class AuditEngine {
         colors: 0,
         accessibility: 0,
         'design-system': 0,
+        performance: 0,
       },
       byViewport: {},
     };
