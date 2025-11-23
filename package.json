@@ -1,5 +1,5 @@
 {
-  "name": "karen-cli",
+  "name": "@twocircles/karen-cli",
   "version": "1.0.0",
   "description": "Karen CLI - Sassy CSS Layout Auditor",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "tsx watch src/cli.ts",
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
     "clean": "rm -rf dist",
     "postinstall": "playwright install chromium",
     "prepublishOnly": "pnpm build && pnpm test"
