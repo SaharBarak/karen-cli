@@ -22,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/saharbarak/KarenCLI.git"
+    "url": "https://github.com/SaharBarak/karen-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/saharbarak/KarenCLI/issues"
+    "url": "https://github.com/SaharBarak/karen-cli/issues"
   },
-  "homepage": "https://github.com/saharbarak/KarenCLI#readme",
+  "homepage": "https://github.com/SaharBarak/karen-cli#readme",
   "keywords": [
     "css",
     "audit",
